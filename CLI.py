@@ -23,3 +23,9 @@ def inputs(data):
       print("incorrect year, only projecting between 2022-2050 inclusive")
       return
   return (sector, year)
+
+def debug(abatement_cost, volume):
+    print("This is the abatement cost")
+    print(abatement_cost)
+    print("This is the volume")
+    print(volume)
