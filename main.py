@@ -66,7 +66,6 @@ def pre_process(sheet):
         if (type(row[0].v) == float and int(row[0].v) >= num_ERA):
             num_ERA = int(row[0].v)
 
-    print(f"The num_ERA = {num_ERA}")
     ## Starts at 2022 (col 5) and ends at 2050 (col 33) in the template
     start = 5 
     end = 33
@@ -92,26 +91,25 @@ def pre_process(sheet):
                     else:
                         data[row[0].v][yr].set_volume(row[yr].v)   
 
-    # Takes the dictionary and returns it in an array              
     ret_data = []
-    for outer_key, inner_dict in data.items():
-        for inner_key, value in inner_dict.items():
-            ret_data.append(value)
-    return ret_data
+    for outer_key, outer in data.items():
+        for inner_key, inner in outer.items():
+            ret_data.append(inner)
+    return (num_ERA, ret_data)
 
 # function that does polynomial interpolation (this can be swapped out for log)
 def poly_function(target, year):
     x = []
     y = []
     for point in target:
-        x.append(point[0])
+        x.append(point[0]-2022)
         y.append(point[1])
     poly = np.polyfit(x,y,2)
     x_prime = year - 2022
-    new_vol = 0
+    new_val = 0
     for i in range(0, len(poly)):
-        new_vol += poly[i]*(x_prime**(len(poly)-1-i))
-    return new_vol
+        new_val += poly[i]*(x_prime**(len(poly)-1-i))
+    return new_val
 
 ## Check number of existing data for that particular activity 
 def scope(id, year, data, check_volume):
@@ -153,27 +151,77 @@ def interpolate_volume(data):
         if (int(act.volume) == int(-1)):
             # Check number of existing data for that year
             new_vol = scope(act.id, act.year, data, check_volume=True)
-            new_ERA = ERA(act.id, act.sector_name, act.sub_sector_name, act.action, act.year+2017)
+            new_ERA = ERA(act.id, act.sector_name, act.sub_sector_name, act.action, act.year)
             new_ERA.set_abatement_cost(act.abatement_cost)
             new_ERA.set_volume(new_vol)
             target.append(new_ERA)
         else:
             target.append(act)
     return target
-
 def interpolate_cost(data):
     target = []
     for act in data:
         if (int(act.abatement_cost) == int(-1)):
             # Check number of existing data for that year
             new_cost = scope(act.id, act.year, data, check_volume=False)
-            new_ERA = ERA(act.id, act.sector_name, act.sub_sector_name, act.action, act.year+2017)
+            new_ERA = ERA(act.id, act.sector_name, act.sub_sector_name, act.action, act.year)
             new_ERA.set_abatement_cost(new_cost)
             new_ERA.set_volume(act.volume)
             target.append(new_ERA)
         else:
             target.append(act)
     return target
+
+def list_to_dict(data):
+    # Takes the dictionary and returns it in an array              
+    ret_data = collections.defaultdict(dict)
+    for item in data:
+        ret_data[item.id][item.year] = item
+    return ret_data
+
+## Function that exports all interpolated data into a new spreadsheet
+def export(data, num_ERA, file_name):
+
+    ## Converted into dicts for optimisation
+    data_dict = list_to_dict(data)
+    ## Need to create the dataframe from data here
+    header = ["Sector", "Emitting Activity", "ERA"]
+    for year in range(2022, 2051):
+        header.append(year)
+
+    IDs = []
+    for ID in range(1, num_ERA+1):
+        IDs.append(ID)
+
+    volume_data = []
+    for ERA_id in range(1, num_ERA + 1):
+        ERA_data = []
+        ERA_data.append(data_dict[ERA_id][2022].sector_name)        
+        ERA_data.append(data_dict[ERA_id][2022].sub_sector_name)
+        ERA_data.append(data_dict[ERA_id][2022].action)
+
+        for year in range (2022, 2051):
+            ERA_data.append(data_dict[ERA_id][year].volume)
+        volume_data.append(ERA_data)
+    volume_df = pd.DataFrame(volume_data, index=IDs, columns=header)  # doctest: +SKIP
+    cost_data = []
+    for ERA_id in range(1, num_ERA + 1):
+        ERA_data = []
+        ERA_data.append(data_dict[ERA_id][2022].sector_name)        
+        ERA_data.append(data_dict[ERA_id][2022].sub_sector_name)
+        ERA_data.append(data_dict[ERA_id][2022].action)
+
+        for year in range (2022, 2051):
+            ERA_data.append(data_dict[ERA_id][year].abatement_cost)
+        cost_data.append(ERA_data)
+    abatement_cost_df = pd.DataFrame(cost_data, index=IDs, columns=header)  # doctest: +SKIP
+    with pd.ExcelWriter(
+        f"./output/output.xlsb", 
+        mode="w", 
+        engine="openpyxlsb") as writer:
+            volume_df.to_excel(writer, sheet_name="volume")  # doctest: +SKIP
+            abatement_cost_df.to_excel(writer, sheet_name="abatement_cost")
+    print("Exported data")
 
 
 def main(): 
@@ -183,14 +231,21 @@ def main():
     if len(dir_list) > 1:
         print("There are more than one file in the input folder")
         return
-    wb = open_xlsb(f"./input/{dir_list[0]}")
-    sheet = wb.get_sheet(1)
-    data = pre_process(sheet)
+    if len(dir_list) == 0:
+        print("There needs to be an input file in the input folder in .xlsb format")
+        return
     
-    display(data)
+    file_name = dir_list[0]
+    wb = open_xlsb(f"./input/{file_name}")
+    sheet = wb.get_sheet(1)
+    num_ERA, data = pre_process(sheet)
+
     ## interpolating
     data = interpolate_volume(data)
     data = interpolate_cost(data)
+
+    export(data, num_ERA, file_name)
+    return
     ## Inputs
     CLI.intro()
     # sector, year =  CLI.inputs(data)
