@@ -216,9 +216,9 @@ def export(data, num_ERA, file_name):
         cost_data.append(ERA_data)
     abatement_cost_df = pd.DataFrame(cost_data, index=IDs, columns=header)  # doctest: +SKIP
     with pd.ExcelWriter(
-        f"./output/output.xlsb", 
+        "./output/output.xlsx", 
         mode="w", 
-        engine="openpyxlsb") as writer:
+        engine="openpyxl") as writer:
             volume_df.to_excel(writer, sheet_name="volume")  # doctest: +SKIP
             abatement_cost_df.to_excel(writer, sheet_name="abatement_cost")
     print("Exported data")
@@ -227,7 +227,8 @@ def export(data, num_ERA, file_name):
 def main(): 
 
     ## Code for processing excel into datastore (blackbox)
-    dir_list = os.listdir("./input")
+    dir_list = os.listdir("./input/")
+    print(dir_list)
     if len(dir_list) > 1:
         print("There are more than one file in the input folder")
         return
@@ -244,12 +245,12 @@ def main():
     data = interpolate_volume(data)
     data = interpolate_cost(data)
 
+    # Not working atm
     export(data, num_ERA, file_name)
-    return
     ## Inputs
     CLI.intro()
     # sector, year =  CLI.inputs(data)
-    sector = "Industry"
+    sector = "Electricity"
     year = 2030
 
     ## Selects the data based on the filter given
