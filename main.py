@@ -18,6 +18,7 @@ class ERA():
         self.id = id
         self.sector_name = sector_name
         self.sub_sector_name = sub_sector_name
+        self.subsector_volume = float(-2)
         self.action = action
         self.volume = float(-2)
         self.year = int(year)
@@ -38,6 +39,8 @@ class ERA():
         self.volume = volume
     def set_abatement_cost(self, abatement_cost):
         self.abatement_cost = abatement_cost
+    def set_subsector_volume(self, sub_sector_volume):
+        self.subsector_volume = sub_sector_volume
 
 
 ## Function for debuggin to see what data is selected
@@ -122,8 +125,7 @@ def scope(id, year, data, check_volume):
                 available += 1
                 target.append((act.year, act.volume))
         if available == 0:
-            print("Insufficient data inputted, check that all relevant cells are filled")
-            exit()
+            return 0
         if (available == 1):    
             new_vol = target[0][1] 
             return new_vol
@@ -154,6 +156,7 @@ def interpolate_volume(data):
             new_ERA = ERA(act.id, act.sector_name, act.sub_sector_name, act.action, act.year)
             new_ERA.set_abatement_cost(act.abatement_cost)
             new_ERA.set_volume(new_vol)
+            new_ERA.set_subsector_volume(act.subsector_volume)
             target.append(new_ERA)
         else:
             target.append(act)
@@ -163,10 +166,15 @@ def interpolate_cost(data):
     for act in data:
         if (int(act.abatement_cost) == int(-1)):
             # Check number of existing data for that year
-            new_cost = scope(act.id, act.year, data, check_volume=False)
+            try:
+                new_cost = scope(act.id, act.year, data, check_volume=False)
+            except:
+                act.print_entity()
+                exit()
             new_ERA = ERA(act.id, act.sector_name, act.sub_sector_name, act.action, act.year)
             new_ERA.set_abatement_cost(new_cost)
             new_ERA.set_volume(act.volume)
+            new_ERA.set_subsector_volume(act.subsector_volume)
             target.append(new_ERA)
         else:
             target.append(act)
@@ -180,7 +188,7 @@ def list_to_dict(data):
     return ret_data
 
 ## Function that exports all interpolated data into a new spreadsheet
-def export(data, num_ERA, file_name):
+def export(data, num_ERA):
 
     ## Converted into dicts for optimisation
     data_dict = list_to_dict(data)
